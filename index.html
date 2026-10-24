@@ -37,12 +37,20 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 <section id="bank" class="view">
 <div class="grid">
 <div class="span-4 card">
-<h2 id="formTitle">Adicionar questão</h2><p class="muted small">Preencha a pergunta, as alternativas e marque uma ou mais respostas corretas.</p>
+<h2 id="formTitle">Adicionar questão</h2><p class="muted small">Preencha a pergunta, as alternativas e defina a resposta correta.</p>
 <form id="questionForm" class="stack">
 <input type="hidden" id="editId">
 <div class="field"><label for="subject">Matéria *</label><input id="subject" list="subjectOptions" required placeholder="Ex.: Saúde do Adulto"><datalist id="subjectOptions"></datalist></div>
 <div class="field"><label for="topic">Assunto / Aula (opcional)</label><input id="topic" list="topicOptions" placeholder="Ex.: Aula 1 - RCP, sinais vitais..."><datalist id="topicOptions"></datalist></div>
 <div class="field"><label for="questionText">Pergunta *</label><textarea id="questionText" required placeholder="Digite o enunciado da questão"></textarea></div>
+
+<div class="field">
+  <label for="questionMode">Tipo de Questão *</label>
+  <select id="questionMode">
+    <option value="single">Única escolha (Apenas 1 resposta certa)</option>
+    <option value="multiple">Múltipla escolha (1 ou mais respostas certas)</option>
+  </select>
+</div>
 
 <div class="field">
   <div class="row between">
@@ -52,7 +60,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
       <button type="button" class="secondary" id="addOptionBtn" style="padding:4px 8px;font-size:12px">+ Adicionar</button>
     </div>
   </div>
-  <p class="muted small" style="margin-top:0">Marque a caixa ao lado da alternativa se ela for correta (você pode selecionar mais de uma).</p>
+  <p class="muted small" style="margin-top:0">Marque a alternativa correta no gabarito.</p>
   <div id="optionsEditor" class="stack" style="margin-top:4px"></div>
 </div>
 
@@ -83,7 +91,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 <div class="notice small">A prova é temporária: a tentativa é registrada no histórico ao ser entregue ou quando o tempo acabar. Suas questões originais não são alteradas.</div>
 <button id="startExam">Gerar prova</button><div id="examAvailability" class="muted small"></div>
 </div></div>
-<div class="span-6 card"><h2>Dicas para o simulado</h2><ul><li>O algoritmo ponderado garante que nenhuma pergunta fique oculta ou travada (como as antigas perguntas X ou Y).</li><li>Você pode selecionar uma ou mais aulas específicas de uma matéria para focar seus estudos.</li><li>Você pode navegar pelas questões sem perder suas respostas.</li><li>Ao finalizar, verá a nota, o gabarito e os comentários cadastrados.</li></ul></div>
+<div class="span-6 card"><h2>Dicas para o simulado</h2><ul><li>Questões de escolha única utilizam seleção exclusiva, enquanto as de múltipla escolha aceitam mais de uma resposta.</li><li>Você pode selecionar uma ou mais aulas específicas de uma matéria para focar seus estudos.</li><li>Você pode navegar pelas questões sem perder suas respostas.</li><li>Ao finalizar, verá a nota, o gabarito e os comentários cadastrados.</li></ul></div>
 </div>
 <div id="examTaking" class="hidden">
 <div class="card stack">
@@ -148,29 +156,19 @@ function getQuestionUsageCounts(){
   return counts;
 }
 
-// NOVO SISTEMA DE SELEÇÃO PONDERADA COM ALEATORIEDADE (Soft-Prioritization)
 function pickSmartQuestions(pool, count){
   const usage = getQuestionUsageCounts();
-  
-  // Atribui pontuação ponderada: menos uso = maior base, somado a um fator estocástico alto
   const weightedPool = pool.map(q => {
     const used = usage[q.id] || 0;
-    // Fator base inversamente proporcional ao uso + forte aleatoriedade para evitar bloqueios ou exclusões
     const baseWeight = 1 / (used + 1);
-    const randomFactor = Math.random() * 3.0; // Alta variação para garantir que qualquer questão possa ser sorteada
+    const randomFactor = Math.random() * 3.0;
     return {
       question: q,
       score: baseWeight + randomFactor
     };
   });
-
-  // Ordena pelo score decrescente
   weightedPool.sort((a, b) => b.score - a.score);
-
-  // Seleciona a quantidade desejada
   const selected = weightedPool.slice(0, count).map(item => item.question);
-
-  // Embaralha o resultado final para a prova
   return shuffle(selected);
 }
 
@@ -181,17 +179,25 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()
 document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.goto)));
 $('goExam').onclick=()=>showTab('exam');
 
-function buildOptionsEditor(optionsData=[], correctArray=[]){
+function buildOptionsEditor(optionsData=[], correctArray=[], mode='single'){
   if(!optionsData.length) optionsData = ['', '', '', ''];
   const container = $('optionsEditor');
   container.innerHTML = optionsData.map((item,i)=>{
     const optVal = typeof item==='object' ? item.text : (item||'');
     const explVal = typeof item==='object' ? (item.explanation||'') : '';
     const isChecked = correctArray.includes(i) ? 'checked' : '';
+    
+    let inputHtml = '';
+    if(mode === 'single'){
+      inputHtml = `<label class="row" style="cursor:pointer;font-size:13px;font-weight:normal;gap:5px"><input type="radio" name="correctRadio" class="correct-radio" value="${i}" ${isChecked} style="width:16px;height:16px"> Gabarito correto</label>`;
+    } else {
+      inputHtml = `<label class="row" style="cursor:pointer;font-size:13px;font-weight:normal;gap:5px"><input type="checkbox" class="correct-check" value="${i}" ${isChecked} style="width:16px;height:16px"> Gabarito correto</label>`;
+    }
+
     return `<div class="field" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafafa" data-option-row="${i}">
       <div class="row between" style="margin-bottom:6px">
         <label for="opt${i}">Alternativa ${letters[i]} *</label>
-        <label class="row" style="cursor:pointer;font-size:13px;font-weight:normal;gap:5px"><input type="checkbox" class="correct-check" value="${i}" ${isChecked} style="width:16px;height:16px"> Gabarito correto</label>
+        ${inputHtml}
       </div>
       <input id="opt${i}" required value="${esc(optVal)}" placeholder="Texto da alternativa ${letters[i]}" style="margin-bottom:6px">
       <label for="optExpl${i}" class="small muted" style="font-weight:normal">Comentário desta alternativa (opcional)</label>
@@ -202,6 +208,24 @@ function buildOptionsEditor(optionsData=[], correctArray=[]){
   $('addOptionBtn').style.display = optionsData.length < 10 ? 'inline-block' : 'none';
 }
 
+$('questionMode').onchange = () => {
+  const currentCount = document.querySelectorAll('#optionsEditor [data-option-row]').length;
+  const data = Array.from({length: currentCount}, (_, i) => ({
+    text: $('opt'+i) ? $('opt'+i).value : '',
+    explanation: $('optExpl'+i) ? $('optExpl'+i).value : ''
+  }));
+  const mode = $('questionMode').value;
+  let currentCorrect = [];
+  if(mode === 'single'){
+    const checkedRadio = document.querySelector('.correct-radio:checked');
+    currentCorrect = checkedRadio ? [Number(checkedRadio.value)] : [0];
+  } else {
+    currentCorrect = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value));
+    if(currentCorrect.length === 0) currentCorrect = [0];
+  }
+  buildOptionsEditor(data, currentCorrect, mode);
+};
+
 $('addOptionBtn').onclick = () => {
   const currentCount = document.querySelectorAll('#optionsEditor [data-option-row]').length;
   if(currentCount >= 10) return;
@@ -209,9 +233,16 @@ $('addOptionBtn').onclick = () => {
     text: $('opt'+i).value,
     explanation: $('optExpl'+i).value
   }));
-  const currentCorrect = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value));
+  const mode = $('questionMode').value;
+  let currentCorrect = [];
+  if(mode === 'single'){
+    const checkedRadio = document.querySelector('.correct-radio:checked');
+    currentCorrect = checkedRadio ? [Number(checkedRadio.value)] : [0];
+  } else {
+    currentCorrect = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value));
+  }
   data.push({text: '', explanation: ''});
-  buildOptionsEditor(data, currentCorrect);
+  buildOptionsEditor(data, currentCorrect, mode);
 };
 
 $('removeOptionBtn').onclick = () => {
@@ -221,13 +252,31 @@ $('removeOptionBtn').onclick = () => {
     text: $('opt'+i).value,
     explanation: $('optExpl'+i).value
   }));
-  const currentCorrect = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value)).filter(idx => idx < currentCount - 1);
-  buildOptionsEditor(data, currentCorrect);
+  const mode = $('questionMode').value;
+  let currentCorrect = [];
+  if(mode === 'single'){
+    const checkedRadio = document.querySelector('.correct-radio:checked');
+    let val = checkedRadio ? Number(checkedRadio.value) : 0;
+    if(val >= currentCount - 1) val = 0;
+    currentCorrect = [val];
+  } else {
+    currentCorrect = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value)).filter(idx => idx < currentCount - 1);
+  }
+  buildOptionsEditor(data, currentCorrect, mode);
 };
 
-buildOptionsEditor();
+buildOptionsEditor(['','','',''], [0], 'single');
 
-function resetForm(){ $('questionForm').reset();$('editId').value='';$('formTitle').textContent='Adicionar questão';$('saveQuestion').textContent='Salvar questão';$('cancelEdit').classList.add('hidden');buildOptionsEditor(['','','',''], [0]);renderBank(); }
+function resetForm(){ 
+  $('questionForm').reset();
+  $('editId').value='';
+  $('formTitle').textContent='Adicionar questão';
+  $('saveQuestion').textContent='Salvar questão';
+  $('cancelEdit').classList.add('hidden');
+  $('questionMode').value='single';
+  buildOptionsEditor(['','','',''], [0], 'single');
+  renderBank(); 
+}
 $('cancelEdit').onclick=resetForm;
 
 $('questionForm').addEventListener('submit',e=>{
@@ -238,11 +287,22 @@ $('questionForm').addEventListener('submit',e=>{
     text: $('opt'+i).value.trim(),
     explanation: $('optExpl'+i).value.trim()
   }));
-  const correctArr = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value));
   
-  if(correctArr.length === 0){
-    alert('Marque pelo menos uma alternativa como correta no gabarito.');
-    return;
+  const mode = $('questionMode').value;
+  let correctArr = [];
+  if(mode === 'single'){
+    const selectedRadio = document.querySelector('.correct-radio:checked');
+    if(!selectedRadio){
+      alert('Selecione a alternativa correta.');
+      return;
+    }
+    correctArr = [Number(selectedRadio.value)];
+  } else {
+    correctArr = Array.from(document.querySelectorAll('.correct-check:checked')).map(cb => Number(cb.value));
+    if(correctArr.length === 0){
+      alert('Marque pelo menos uma alternativa como correta no gabarito.');
+      return;
+    }
   }
 
   const q={
@@ -275,7 +335,9 @@ function editQuestion(id){
    explanation: q.optionExplanations ? (q.optionExplanations[i] || '') : ''
  }));
  const correctArr = Array.isArray(q.correct) ? q.correct : [q.correct];
- buildOptionsEditor(combinedOpts, correctArr);
+ const mode = correctArr.length > 1 ? 'multiple' : 'single';
+ $('questionMode').value = mode;
+ buildOptionsEditor(combinedOpts, correctArr, mode);
 
  $('formTitle').textContent='Editar questão';$('saveQuestion').textContent='Salvar alterações';$('cancelEdit').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -295,7 +357,8 @@ function renderBank(){
  $('questionList').innerHTML=qs.length?qs.map(q=>{
    const corrArr = Array.isArray(q.correct) ? q.correct : [q.correct];
    const corrStr = corrArr.map(c => letters[c]).join(', ');
-   return `<article class="item"><div class="row between"><div class="row"><span class="pill">${esc(q.subject)}</span>${q.topic?`<span class="pill">${esc(q.topic)}</span>`:''}</div><div class="row"><button class="secondary" data-edit="${esc(q.id)}">Editar</button><button class="danger" data-delete="${esc(q.id)}">Excluir</button></div></div><p><strong>${esc(q.text)}</strong></p><p class="muted small">${q.options.length} alternativas · correta(s): ${corrStr}</p></article>`;
+   const typeLabel = corrArr.length > 1 ? 'Múltipla escolha' : 'Escolha única';
+   return `<article class="item"><div class="row between"><div class="row"><span class="pill">${esc(q.subject)}</span>${q.topic?`<span class="pill">${esc(q.topic)}</span>`:''}<span class="pill" style="background:#eef4ff;color:var(--primary)">${typeLabel}</span></div><div class="row"><button class="secondary" data-edit="${esc(q.id)}">Editar</button><button class="danger" data-delete="${esc(q.id)}">Excluir</button></div></div><p><strong>${esc(q.text)}</strong></p><p class="muted small">${q.options.length} alternativas · correta(s): ${corrStr}</p></article>`;
  }).join(''):'<div class="empty">Nenhuma questão encontrada. Cadastre uma ao lado ou importe um arquivo JSON.</div>';
  $('questionList').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editQuestion(b.dataset.edit));
  $('questionList').querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>deleteQuestion(b.dataset.delete));
@@ -417,16 +480,27 @@ function renderActiveQuestion(){
  $('questionNav').innerHTML=activeExam.items.map((it,i)=>`<button class="${i===currentIndex?'current':''} ${it.answer && it.answer.length>0?'answered':''}" data-qindex="${i}" aria-label="Questão ${i+1}">${i+1}</button>`).join('');
  $('questionNav').querySelectorAll('[data-qindex]').forEach(b=>b.onclick=()=>{currentIndex=Number(b.dataset.qindex);renderActiveQuestion();});
  
- $('activeQuestion').innerHTML=`<div class="row"><span class="pill">${currentIndex+1}/${total}</span>${item.topic?`<span class="pill">${esc(item.topic)}</span>`:''}</div><h2 style="margin-top:14px">${esc(item.text)}</h2><p class="muted small"><em>(Questão de múltipla escolha: selecione uma ou mais alternativas corretas)</em></p><div>${item.options.map((opt,i)=>{
+ const isSingle = item.correct.length === 1;
+ const inputType = isSingle ? 'radio' : 'checkbox';
+ const instructionText = isSingle ? '(Questão de escolha única: selecione a alternativa correta)' : '(Questão de múltipla escolha: selecione uma ou mais alternativas corretas)';
+
+ $('activeQuestion').innerHTML=`<div class="row"><span class="pill">${currentIndex+1}/${total}</span>${item.topic?`<span class="pill">${esc(item.topic)}</span>`:''}</div><h2 style="margin-top:14px">${esc(item.text)}</h2><p class="muted small"><em>${instructionText}</em></p><div>${item.options.map((opt,i)=>{
    const isSelected = item.answer && item.answer.includes(i);
-   return `<label class="option ${isSelected?'selected':''}"><input type="checkbox" name="examAnswer" value="${i}" ${isSelected?'checked':''}><span><strong>${letters[i]}.</strong> ${esc(opt)}</span></label>`;
+   return `<label class="option ${isSelected?'selected':''}"><input type="${inputType}" name="examAnswer" value="${i}" ${isSelected?'checked':''}><span><strong>${letters[i]}.</strong> ${esc(opt)}</span></label>`;
  }).join('')}</div>`;
  
- $('activeQuestion').querySelectorAll('input[name="examAnswer"]').forEach(cb=>cb.onchange=()=>{
-   const checked = Array.from($('activeQuestion').querySelectorAll('input[name="examAnswer"]:checked')).map(box => Number(box.value));
-   item.answer = checked;
-   renderActiveQuestion();
- });
+ if(isSingle){
+   $('activeQuestion').querySelectorAll('input[name="examAnswer"]').forEach(r=>r.onchange=()=>{
+     item.answer = [Number(r.value)];
+     renderActiveQuestion();
+   });
+ } else {
+   $('activeQuestion').querySelectorAll('input[name="examAnswer"]').forEach(cb=>cb.onchange=()=>{
+     const checked = Array.from($('activeQuestion').querySelectorAll('input[name="examAnswer"]:checked')).map(box => Number(box.value));
+     item.answer = checked;
+     renderActiveQuestion();
+   });
+ }
 
  $('prevQuestion').disabled=currentIndex===0;$('nextQuestion').disabled=currentIndex===total-1;
 }
