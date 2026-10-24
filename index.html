@@ -28,7 +28,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 <div class="span-12 stats">
 <div class="stat"><b id="statQuestions">0</b><span>Questões no acervo</span></div><div class="stat"><b id="statSubjects">0</b><span>Matérias cadastradas</span></div><div class="stat"><b id="statAttempts">0</b><span>Provas realizadas</span></div><div class="stat"><b id="statAverage">—</b><span>Média de aproveitamento</span></div>
 </div>
-<div class="span-8 card"><h2>Começar uma prova</h2><p class="muted">O sistema sorteia questões apenas da matéria selecionada e não repete questões dentro da mesma prova.</p><button id="goExam">Configurar simulado</button></div>
+<div class="span-8 card"><h2>Começar uma prova</h2><p class="muted">O sistema sorteia questões apenas da matéria selecionada e prioriza as questões inéditas ou menos vistas no histórico.</p><button id="goExam">Configurar simulado</button></div>
 <div class="span-4 card"><h2>Seus dados</h2><p class="muted">Faça backups regularmente para não perder suas questões se limpar os dados do navegador.</p><div class="row"><button id="exportHome">Exportar JSON</button><button class="secondary" id="importHome">Importar</button></div><input type="file" id="importFileHome" accept=".json,application/json" class="hidden"></div>
 <div class="span-12 card"><div class="row between"><h2>Matérias do acervo</h2><button class="secondary" data-goto="bank">Gerenciar questões</button></div><div id="subjectOverview" class="list"></div></div>
 </div>
@@ -43,8 +43,19 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 <div class="field"><label for="subject">Matéria *</label><input id="subject" list="subjectOptions" required placeholder="Ex.: Saúde do Adulto"><datalist id="subjectOptions"></datalist></div>
 <div class="field"><label for="topic">Assunto / Aula (opcional)</label><input id="topic" list="topicOptions" placeholder="Ex.: Aula 1 - RCP, sinais vitais..."><datalist id="topicOptions"></datalist></div>
 <div class="field"><label for="questionText">Pergunta *</label><textarea id="questionText" required placeholder="Digite o enunciado da questão"></textarea></div>
-<div id="optionsEditor" class="stack"></div>
-<div class="field"><label for="correctAnswer">Alternativa correta *</label><select id="correctAnswer" required><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option><option value="4">E</option></select></div>
+
+<div class="field">
+  <div class="row between">
+    <label>Alternativas *</label>
+    <div class="row">
+      <button type="button" class="secondary" id="removeOptionBtn" style="padding:4px 8px;font-size:12px">- Remover</button>
+      <button type="button" class="secondary" id="addOptionBtn" style="padding:4px 8px;font-size:12px">+ Adicionar</button>
+    </div>
+  </div>
+  <div id="optionsEditor" class="stack" style="margin-top:4px"></div>
+</div>
+
+<div class="field"><label for="correctAnswer">Alternativa correta *</label><select id="correctAnswer" required></select></div>
 <div class="field"><label for="explanation">Comentário geral / observação (opcional)</label><textarea id="explanation" placeholder="Comentários adicionais sobre a questão"></textarea></div>
 <div class="row"><button type="submit" id="saveQuestion">Salvar questão</button><button type="button" class="secondary hidden" id="cancelEdit">Cancelar</button></div>
 </form>
@@ -59,7 +70,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 
 <section id="exam" class="view">
 <div id="examSetup" class="grid">
-<div class="span-6 card"><h1>Configurar prova</h1><p class="muted">Escolha uma matéria e opcionalmente aulas específicas. As questões serão sorteadas do seu acervo.</p>
+<div class="span-6 card"><h1>Configurar prova</h1><p class="muted">Escolha uma matéria e opcionalmente aulas específicas. O sistema dará prioridade para questões que você ainda não respondeu.</p>
 <div class="stack">
 <div class="field"><label for="examSubject">Matéria *</label><select id="examSubject" required><option value="">Selecione uma matéria</option></select></div>
 <div class="field" id="examTopicsContainer" style="display:none">
@@ -72,7 +83,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 <div class="notice small">A prova é temporária: a tentativa é registrada no histórico ao ser entregue ou quando o tempo acabar. Suas questões originais não são alteradas.</div>
 <button id="startExam">Gerar prova</button><div id="examAvailability" class="muted small"></div>
 </div></div>
-<div class="span-6 card"><h2>Dicas para o simulado</h2><ul><li>Você pode selecionar uma ou mais aulas específicas de uma matéria para focar seus estudos.</li><li>Você pode navegar pelas questões sem perder suas respostas.</li><li>O cronômetro continua ativo enquanto a prova estiver aberta nesta página.</li><li>Ao finalizar, verá a nota, o gabarito e os comentários cadastrados.</li></ul></div>
+<div class="span-6 card"><h2>Dicas para o simulado</h2><ul><li>O sistema evita repetir perguntas recentes priorizando questões menos vistas do seu acervo.</li><li>Você pode selecionar uma ou mais aulas específicas de uma matéria para focar seus estudos.</li><li>Você pode navegar pelas questões sem perder suas respostas.</li><li>Ao finalizar, verá a nota, o gabarito e os comentários cadastrados.</li></ul></div>
 </div>
 <div id="examTaking" class="hidden">
 <div class="card stack">
@@ -98,7 +109,7 @@ h1,h2,h3{margin:0 0 12px;line-height:1.25}h1{font-size:26px;letter-spacing:-.6px
 (() => {
 const KEY = 'questoes_simulados_v1';
 const $ = id => document.getElementById(id);
-const letters = ['A','B','C','D','E'];
+const letters = ['A','B','C','D','E','F','G','H','I','J'];
 let state = loadState();
 let activeExam = null, timerHandle = null, currentIndex = 0, examSecondsLeft = 0, examStartedAt = null;
 
@@ -113,7 +124,61 @@ function loadState(){
 function saveState(){ localStorage.setItem(KEY, JSON.stringify(state)); renderAll(); }
 function uid(){ return 'q_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// Algoritmo Fisher-Yates seguro para embaralhamento imparcial
+function shuffle(a){
+  const copy = [...a];
+  for(let i = copy.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// Mapeia quantas vezes cada questão foi utilizada nas provas salvas no histórico
+function getQuestionUsageCounts(){
+  const counts = {};
+  state.history.forEach(attempt => {
+    if(Array.isArray(attempt.items)){
+      attempt.items.forEach(item => {
+        if(item.id){
+          counts[item.id] = (counts[item.id] || 0) + 1;
+        }
+      });
+    }
+  });
+  return counts;
+}
+
+// Sorteia questões sem repetição no mesmo exame e priorizando as menos expostas no histórico
+function pickSmartQuestions(pool, count){
+  const usage = getQuestionUsageCounts();
+  const poolWithUsage = pool.map(q => ({
+    question: q,
+    usedCount: usage[q.id] || 0
+  }));
+
+  // Agrupa por contagem de uso (0 vezes usadas, 1 vez usada, etc.)
+  const groups = {};
+  poolWithUsage.forEach(item => {
+    if(!groups[item.usedCount]) groups[item.usedCount] = [];
+    groups[item.usedCount].push(item.question);
+  });
+
+  // Ordena os níveis de uso do menor para o maior
+  const sortedLevels = Object.keys(groups).map(Number).sort((a,b) => a - b);
+
+  let selected = [];
+  for(const level of sortedLevels){
+    const groupQuestions = shuffle(groups[level]);
+    const needed = count - selected.length;
+    if(needed <= 0) break;
+    selected = selected.concat(groupQuestions.slice(0, needed));
+  }
+
+  return shuffle(selected);
+}
+
 function subjects(){return [...new Set(state.questions.map(q=>q.subject.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));}
 function topicsForSubject(subject){return [...new Set(state.questions.filter(q=>q.subject.trim()===subject).map(q=>(q.topic||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));}
 function showTab(tab){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===tab));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); if(tab==='exam') updateExamAvailability(); window.scrollTo({top:0,behavior:'smooth'});}
@@ -121,27 +186,62 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()
 document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.goto)));
 $('goExam').onclick=()=>showTab('exam');
 
+function updateCorrectAnswerSelect(totalOptions, selectedIndex=0){
+  const sel = $('correctAnswer');
+  const currentVal = sel.value !== '' ? Number(sel.value) : selectedIndex;
+  sel.innerHTML = Array.from({length: totalOptions}, (_, i) => `<option value="${i}">Alternativa ${letters[i]}</option>`).join('');
+  sel.value = Math.min(currentVal, totalOptions - 1);
+}
+
 function buildOptionsEditor(optionsData=[]){
-  $('optionsEditor').innerHTML=letters.map((lettr,i)=>{
-    const optVal = optionsData[i] && typeof optionsData[i]==='object' ? optionsData[i].text : (optionsData[i]||'');
-    const explVal = optionsData[i] && typeof optionsData[i]==='object' ? (optionsData[i].explanation||'') : '';
-    return `<div class="field" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafafa">
-      <label for="opt${i}">Alternativa ${lettr} *</label>
-      <input id="opt${i}" required value="${esc(optVal)}" placeholder="Texto da alternativa ${lettr}" style="margin-bottom:6px">
-      <label for="optExpl${i}" class="small muted" style="font-weight:normal">Comentário desta alternativa (opcional — por que está certa ou errada?)</label>
-      <input id="optExpl${i}" value="${esc(explVal)}" placeholder="Ex.: Incorreta pois o valor correto é X..." style="font-size:13px;padding:8px">
+  if(!optionsData.length) optionsData = ['', '', '', ''];
+  const container = $('optionsEditor');
+  container.innerHTML = optionsData.map((item,i)=>{
+    const optVal = typeof item==='object' ? item.text : (item||'');
+    const explVal = typeof item==='object' ? (item.explanation||'') : '';
+    return `<div class="field" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafafa" data-option-row="${i}">
+      <label for="opt${i}">Alternativa ${letters[i]} *</label>
+      <input id="opt${i}" required value="${esc(optVal)}" placeholder="Texto da alternativa ${letters[i]}" style="margin-bottom:6px">
+      <label for="optExpl${i}" class="small muted" style="font-weight:normal">Comentário desta alternativa (opcional)</label>
+      <input id="optExpl${i}" value="${esc(explVal)}" placeholder="Ex.: Incorreta pois..." style="font-size:13px;padding:8px">
     </div>`;
   }).join('');
+  updateCorrectAnswerSelect(optionsData.length);
+  $('removeOptionBtn').style.display = optionsData.length > 2 ? 'inline-block' : 'none';
+  $('addOptionBtn').style.display = optionsData.length < 10 ? 'inline-block' : 'none';
 }
+
+$('addOptionBtn').onclick = () => {
+  const currentCount = document.querySelectorAll('#optionsEditor [data-option-row]').length;
+  if(currentCount >= 10) return;
+  const data = Array.from({length: currentCount}, (_, i) => ({
+    text: $('opt'+i).value,
+    explanation: $('optExpl'+i).value
+  }));
+  data.push({text: '', explanation: ''});
+  buildOptionsEditor(data);
+};
+
+$('removeOptionBtn').onclick = () => {
+  const currentCount = document.querySelectorAll('#optionsEditor [data-option-row]').length;
+  if(currentCount <= 2) return;
+  const data = Array.from({length: currentCount - 1}, (_, i) => ({
+    text: $('opt'+i).value,
+    explanation: $('optExpl'+i).value
+  }));
+  buildOptionsEditor(data);
+};
+
 buildOptionsEditor();
 
-function resetForm(){ $('questionForm').reset();$('editId').value='';$('formTitle').textContent='Adicionar questão';$('saveQuestion').textContent='Salvar questão';$('cancelEdit').classList.add('hidden');$('correctAnswer').value='0';buildOptionsEditor();renderBank(); }
+function resetForm(){ $('questionForm').reset();$('editId').value='';$('formTitle').textContent='Adicionar questão';$('saveQuestion').textContent='Salvar questão';$('cancelEdit').classList.add('hidden');buildOptionsEditor(['','','','']);renderBank(); }
 $('cancelEdit').onclick=resetForm;
 
 $('questionForm').addEventListener('submit',e=>{
   e.preventDefault();
   const id=$('editId').value;
-  const optionsArr = letters.map((_,i)=>({
+  const optionRows = document.querySelectorAll('#optionsEditor [data-option-row]');
+  const optionsArr = Array.from(optionRows).map((_,i)=>({
     text: $('opt'+i).value.trim(),
     explanation: $('optExpl'+i).value.trim()
   }));
@@ -156,7 +256,7 @@ $('questionForm').addEventListener('submit',e=>{
     explanation:$('explanation').value.trim(),
     updatedAt:new Date().toISOString()
   };
-  if(!q.subject||!q.text||q.options.some(x=>!x)){alert('Preencha a matéria, a pergunta e as cinco alternativas.');return;}
+  if(!q.subject||!q.text||q.options.some(x=>!x)){alert('Preencha a matéria, a pergunta e todas as alternativas criadas.');return;}
   const idx=state.questions.findIndex(x=>x.id===id);
   if(idx>=0)state.questions[idx]=q;else state.questions.push(q);
   saveState();resetForm();showTab('bank');
@@ -169,13 +269,13 @@ function editQuestion(id){
  $('topic').value=q.topic||'';
  $('questionText').value=q.text;
  $('explanation').value=q.explanation||'';
- $('correctAnswer').value=String(q.correct);
  
  const combinedOpts = q.options.map((optText,i)=>({
    text: optText,
    explanation: q.optionExplanations ? (q.optionExplanations[i] || '') : ''
  }));
  buildOptionsEditor(combinedOpts);
+ $('correctAnswer').value=String(q.correct);
 
  $('formTitle').textContent='Editar questão';$('saveQuestion').textContent='Salvar alterações';$('cancelEdit').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -251,8 +351,10 @@ function updateExamCountHint(){
  if(selectedTopics.length > 0){
    pool = pool.filter(q => selectedTopics.includes((q.topic||'').trim()));
  }
+ const usage = getQuestionUsageCounts();
+ const unusedCount = pool.filter(q => !usage[q.id]).length;
  const n = pool.length;
- $('examAvailability').textContent = `${n} questão(ões) disponíveis com os filtros selecionados.`;
+ $('examAvailability').textContent = `${n} questão(ões) disponíveis (${unusedCount} inédita(s)).`;
  $('startExam').disabled = n === 0;
 }
 
@@ -268,7 +370,10 @@ function startExam(){
  if(!subject||!pool.length){alert('Selecione uma matéria e aulas válidas com questões cadastradas.');return;}
  let count=Math.max(1,Math.min(200,Number($('examCount').value)||10));count=Math.min(count,pool.length);
  if(count<Number($('examCount').value))alert(`O filtro selecionado tem apenas ${pool.length} questão(ões). A prova terá ${pool.length}.`);
- const picked=shuffle([...pool]).slice(0,count), doShuffle=$('shuffleOptions').checked;
+ 
+ // Utiliza a seleção inteligente que evita repetições
+ const picked = pickSmartQuestions(pool, count);
+ const doShuffle = $('shuffleOptions').checked;
  const subjectLabel = selectedTopics.length > 0 ? `${subject} (${selectedTopics.join(', ')})` : subject;
  
  activeExam={subject:subjectLabel,items:picked.map(q=>{
@@ -329,10 +434,7 @@ function renderResult(a){
  const wrong=a.items.filter(it=>it.answer===null||it.originalIndexes[it.answer]!==it.correct);
  $('examResult').innerHTML=`<div class="card stack"><div class="row between"><div><span class="pill">${esc(a.subject)}</span><h1 style="margin-top:10px">Resultado do simulado</h1><p class="muted">${new Date(a.date).toLocaleString('pt-BR')}${a.timeout?' · tempo esgotado':''}</p></div><div style="text-align:right"><div style="font-size:38px;font-weight:850">${a.percent}%</div><div class="muted">${a.correct} de ${a.total} corretas</div></div></div><div class="progress"><div style="width:${a.percent}%"></div></div><div class="row"><span class="pill good">${a.correct} acertos</span><span class="pill" style="color:var(--bad)">${a.total-a.correct} erros ou em branco</span></div><div class="row"><button id="retryWrong" ${wrong.length?'':'disabled'}>Refazer erradas (${wrong.length})</button><button class="secondary" id="newExamResult">Nova prova</button><button class="secondary" id="backHistory">Ver histórico</button></div><h2>Gabarito comentado</h2><div>${a.items.map((it,i)=>{
    const isCorrect=it.answer!==null&&it.originalIndexes[it.answer]===it.correct;
-   const correctOrigIdx = it.originalIndexes.indexOf(it.correct);
-   const correctLetter = letters[correctOrigIdx];
    
-   // Render options with their individual explanations if available
    const optionsHtml = it.options.map((optText, dispIdx)=>{
      const origIdx = it.originalIndexes[dispIdx];
      const isThisCorrect = (origIdx === it.correct);
@@ -389,14 +491,14 @@ function importData(file){
   const data=JSON.parse(reader.result);
   if(!data||!Array.isArray(data.questions))throw new Error('O arquivo não contém uma lista válida de questões.');
   const normalized=data.questions.map((q,i)=>{
-   if(!q.subject||!q.text||!Array.isArray(q.options)||q.options.length!==5||!Number.isInteger(Number(q.correct))||Number(q.correct)<0||Number(q.correct)>4)throw new Error(`Questão ${i+1} inválida. Cada questão precisa ter matéria, pergunta, cinco alternativas e gabarito de A a E.`);
+   if(!q.subject||!q.text||!Array.isArray(q.options)||q.options.length<2||!Number.isInteger(Number(q.correct))||Number(q.correct)<0||Number(q.correct)>=q.options.length)throw new Error(`Questão ${i+1} inválida. Cada questão precisa ter matéria, pergunta, ao menos duas alternativas e um gabarito válido.`);
    return {
      id:String(q.id||uid()),
      subject:String(q.subject),
      topic:String(q.topic||''),
      text:String(q.text),
      options:q.options.map(String),
-     optionExplanations:Array.isArray(q.optionExplanations)?q.optionExplanations.map(String):Array(5).fill(''),
+     optionExplanations:Array.isArray(q.optionExplanations)?q.optionExplanations.map(String):Array(q.options.length).fill(''),
      correct:Number(q.correct),
      explanation:String(q.explanation||''),
      updatedAt:q.updatedAt||new Date().toISOString()
